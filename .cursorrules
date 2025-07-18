@@ -1,0 +1,253 @@
+1. 简介 (Introduction)
+1.1 项目背景
+随着大语言模型（LLM）应用的普及，用户对智能化、自动化的信息处理工具需求日益增长。本项目旨在构建一个智能股票分析AI Agent，该Agent能基于实时、全面的金融数据，为用户生成高质量的个股分析报告。为了实现这一目标，我们需要一个稳定、高效、数据全面的后端API服务，作为连接LLM与金融数据源的桥梁。
+
+1.2 产品目标
+本API服务（代号: "DataQuark"）的核心目标是：为上游的AI Agent（基于Dify平台）提供一个单一、标准化的接口。通过调用此接口，Agent能一次性获取分析一只A股股票所需的全部结构化数据，涵盖基本面、估值、技术面和消息面四大维度。
+
+1.3 解决的问题
+数据孤岛: 金融数据分散在不同接口和来源，获取流程复杂。本API将聚合这些数据，简化获取流程。
+
+LLM的局限性: LLM自身不具备实时访问外部金融数据库的能力，其内部知识也存在滞后性。本API为其提供实时、准确的数据“燃料”。
+
+非结构化数据: 原始金融数据对LLM并不友好。本API负责将数据清洗、处理并以高度结构化的JSON格式提供，便于LLM解析和利用。
+
+2. 用户画像与场景 (User Personas & Scenarios)
+本产品的核心“用户”是一个系统，而非人类。
+
+用户画像: Dify AI Agent
+
+用户特征:
+
+通过HTTP协议与外部服务交互。
+
+能够解析和理解结构化的JSON数据。
+
+依赖清晰的API响应（包括成功和失败）来决定后续行为。
+
+对响应延迟敏感，需要快速的数据反馈以保证对话的流畅性。
+
+核心场景:
+
+Dify Agent从最终用户处接收到分析某只股票的指令（如“分析贵州茅台”）。
+
+Agent识别出股票代码，并调用本API服务的/api/v1/stock/full-report接口，传入该代码。
+
+本API服务返回包含该股票所有维度的详细数据的JSON包。
+
+Agent将返回的数据注入到其Prompt中，并请求LLM生成分析报告。
+
+如果API返回错误（如股票代码无效），Agent能够接收错误信息，并向最终用户反馈“无法找到该股票”等提示。
+
+3. 用户故事与验收标准 (User Stories & Acceptance Criteria)
+本节将功能需求转化为以用户（即Dify Agent）为中心的故事，并为每个故事定义了明确的验收标准。
+
+User Story 1: 获取完整的股票数据
+作为 一个Dify AI Agent，
+
+我想要 调用一个单一、稳定的API端点并传入一个A股股票代码，
+
+以便 我能一次性获取生成一份完整分析报告所需的所有结构化数据（包括基本面、估值、技术面和消息面）。
+
+验收标准 (Acceptance Criteria):
+
+Given 提供一个有效的6位A股股票代码 (e.g., "600519")，
+
+When 向 GET /api/v1/stock/full-report?code={code} 发送请求，
+
+Then API必须返回 200 OK 状态码。
+
+And 响应体必须是一个有效的JSON对象。
+
+And JSON对象的顶级键必须包含 code, name, update_time, fundamental_analysis, valuation_analysis, technical_analysis, sentiment_analysis。
+
+And 响应体中的 code 和 name 字段必须与请求的股票代码匹配。
+
+User Story 2: 处理无效输入
+作为 一个Dify AI Agent，
+
+我想要 在我提供无效或不存在的股票代码时，收到一个清晰、可识别的错误响应，
+
+以便 我能够优雅地处理该错误，并向最终用户反馈准确的提示（例如，“抱歉，找不到您输入的股票信息”）。
+
+验收标准 (Acceptance Criteria):
+
+Given 提供一个格式不正确的股票代码 (e.g., "123", "abcde"),
+
+When 发送API请求,
+
+Then API必须返回 400 Bad Request 状态码。
+
+And 响应体JSON中必须包含一个 detail 字段，说明错误原因。
+
+Given 提供一个格式正确但不存在的股票代码 (e.g., "999999"),
+
+When 发送API请求,
+
+Then API必须返回 404 Not Found 状态码。
+
+And 响应体JSON中必须包含一个 detail 字段，说明未找到数据。
+
+4. 技术栈概览 (Tech Stack Overview)
+本项目的技术选型旨在实现高性能、高开发效率和高可维护性。
+
+语言 (Language): Python 3.12+
+
+理由: 拥有强大的数据科学生态（Pandas）和广泛的社区支持，是akshare库的基础。
+
+Web框架 (Web Framework): FastAPI
+
+理由: 提供极高的性能（基于Starlette和Pydantic），内置异步支持，自动生成交互式API文档（Swagger UI），能极大提升开发效率和接口质量。
+
+数据接口库 (Data Library): Akshare
+
+理由: 领先的开源中文财经数据接口库，覆盖面广，能满足本项目绝大部分数据需求。
+
+数据模型验证 (Data Validation): Pydantic
+
+理由: FastAPI的核心依赖，通过Python类型提示提供运行时数据验证、序列化和文档生成，确保API的健壮性。
+
+服务器 (Web Server): Uvicorn
+
+理由: 轻量高效的ASGI服务器，是运行FastAPI应用官方推荐的标准。
+
+容器化 (Containerization): Docker
+
+理由: 实现开发、测试和生产环境的一致性，简化部署流程，便于横向扩展。
+
+5. 开发与实施指南 (Development & Implementation Guidelines)
+为确保项目代码的质量、一致性和可维护性，所有开发活动必须遵循以下指南。
+
+5.1 建议的文件结构 (Suggested File Structure)
+项目应采用模块化的结构组织文件，便于职责分离和未来扩展。
+
+stock-analysis-api/
+│
+├── app/                  # 应用核心代码目录
+│   ├── __init__.py
+│   ├── main.py           # FastAPI应用实例和API路由定义
+│   ├── services/         # 业务逻辑层
+│   │   ├── __init__.py
+│   │   └── stock_service.py # 封装所有与akshare交互和数据处理的函数
+│   ├── models/           # Pydantic数据模型定义
+│   │   ├── __init__.py
+│   │   └── stock_models.py  # 定义请求和响应的数据结构
+│   └── core/             # 应用核心配置
+│       ├── __init__.py
+│       └── config.py        # 配置管理（如环境变量）
+│
+├── tests/                # 测试代码目录
+│   ├── __init__.py
+│   └── test_api.py       # 针对API端点的单元测试和集成测试
+│
+├── .env.example          # 环境变量示例文件
+├── .gitignore            # Git忽略文件配置
+├── Dockerfile            # 用于构建Docker镜像的配置文件
+├── requirements.txt      # Python依赖包列表
+└── README.md             # 项目说明文档
+5.2 后端开发指南 (Backend Development Guidelines)
+编码风格 (Coding Style):
+
+严格遵守 PEP 8 规范。
+
+推荐使用 black 进行代码自动格式化，使用 isort 进行import排序，以确保代码风格的绝对一致。
+
+命名约定 (Naming Conventions):
+
+变量与函数: snake_case (e.g., stock_code, get_full_stock_data).
+
+类与Pydantic模型: PascalCase (e.g., StockReport, FundamentalAnalysis).
+
+常量: UPPER_SNAKE_CASE (e.g., CACHE_TTL = 300).
+
+Python文件名: snake_case (e.g., stock_service.py).
+
+API设计 (API Design):
+
+遵循 RESTful 设计原则。使用名词表示资源（e.g., /stocks）。
+
+版本控制: API应包含版本号，如 /api/v1/...。
+
+端点路径: 使用小写字母和连字符-或下划线_。为保持与Python风格一致，本项目推荐下划线 _ (e.g., /full_report)。
+
+明确的HTTP动词: GET (获取), POST (创建), PUT (更新), DELETE (删除)。本项目核心为GET。
+
+业务逻辑分离: 路由函数 (main.py) 应保持简洁，只负责请求校验和调用服务层函数。所有复杂的数据处理和业务逻辑必须封装在服务层 (services/)。
+
+配置管理 (Configuration Management):
+
+禁止硬编码配置项（如API密钥、缓存时间等）。
+
+所有配置应通过环境变量加载。在代码中通过core/config.py读取，并提供一个.env.example文件作为模板。
+
+提交信息 (Commit Messages):
+
+遵循 Conventional Commits 规范。每次提交都应有明确的类型前缀，便于生成变更日志和版本管理。
+
+示例:
+
+feat: add valuation analysis module to stock service
+
+fix: resolve data parsing error for stocks with null PE
+
+docs: update README with deployment instructions
+
+refactor: improve caching logic in stock_service
+
+6. 技术栈 (Technology Stack)
+语言: Python 3.12
+
+Web框架: FastAPI
+
+数据接口库: Akshare
+
+服务器: Uvicorn
+
+数据模型验证: Pydantic
+
+部署: Docker容器化部署
+
+7. 里程碑与版本规划 (Milestones & Versioning)
+v1.0 (当前版本):
+
+实现单一GET /api/v1/stock/full-report端点。
+
+覆盖第4章中至少80%的数据点。
+
+实现基本的内存缓存（LRU Cache）。
+
+完成Docker化部署。
+
+v1.1 (未来版本):
+
+引入Redis作为更持久化的缓存方案。
+
+实现并发请求以优化数据获取速度。
+
+增加API Key认证和速率限制。
+
+v2.0 (未来版本):
+
+扩展支持港股和美股市场。
+
+增加WebSocket接口，用于推送实时行情数据。
+
+8. 风险与依赖 (Risks & Dependencies)
+核心依赖: 本服务强依赖于akshare库及其底层数据源的稳定性和可用性。akshare或其数据源的任何中断都将直接导致本服务中断。
+
+数据质量风险: akshare提供的数据质量直接决定了本API的输出质量。
+
+性能瓶颈: 串行调用多个akshare接口可能导致响应超时，必须在设计上考虑并发处理。
+
+9. 验收标准 (Acceptance Criteria)
+所有在第3章中定义的功能需求都已实现。
+
+API的响应体JSON结构严格符合第4章的定义。
+
+API的性能和可靠性达到第5章中定义的标准。
+
+代码完成单元测试，核心逻辑覆盖率达到80%以上。
+
+提供完整的、可交互的Swagger API文档。
+
+能够成功部署，并被Dify Agent成功调用和解析数据。

@@ -172,7 +172,7 @@ class StockReport(BaseModel):
 
 class StockCodeRequest(BaseModel):
     """股票代码请求模型"""
-    code: str = Field(..., description="股票代码", regex=r"^\d{6}$")
+    code: str = Field(..., description="股票代码", pattern=r"^\d{6}$")
     
     @validator('code')
     def validate_stock_code(cls, v):

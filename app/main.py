@@ -106,7 +106,7 @@ async def health_check():
 async def get_stock_full_report(
     code: str = Query(
         ...,
-        regex=r"^\d{6}$",
+        pattern=r"^\d{6}$",
         description="6位A股股票代码，例如：600519（贵州茅台）",
         example="600519"
     )
@@ -171,7 +171,7 @@ async def get_stock_full_report(
 async def get_stock_basic_info(
     code: str = Query(
         ...,
-        regex=r"^\d{6}$",
+        pattern=r"^\d{6}$",
         description="6位A股股票代码",
         example="600519"
     )
